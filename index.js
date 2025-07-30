@@ -419,18 +419,38 @@ client.on('interactionCreate', async interaction => {
         break;
       }
 
-      case 'topraklar': {
-        // Örnek verilerle gösterim
-        const kralliklar = ['Krallık A', 'Krallık B', 'Krallık C'];
-        const toprakSayilari = [10, 15, 7];
-        let metin = '';
-        kralliklar.forEach((k, i) => {
-          metin += `${k}: ${toprakSayilari[i]} toprak\n`;
-        });
+     if (commandName === 'topraklar') {
+  // Tüm sunucuda krallık rolü taşıyanları bul, krallık isimlerini çıkar
+  const kralliklarSet = new Set();
 
-        await interaction.reply({ content: metin });
-        break;
-      }
+  // Sunucudaki tüm roller arasında, krallık rolleri 👑 Kral, 🤴 Veliaht gibi rolleri tespit et
+  interaction.guild.roles.cache.forEach(role => {
+    // Krallık rollerinin isim formatı: "👑 Roma Kralı" veya "🤴 Roma Veliahtı"
+    if (role.name.match(/(Kralı|Veliahtı|Komutanı|Muhafızı|Avcısı|Madencisi|Demircisi|Fırıncısı|Çiftçisi|Balıkçısı|Terzisi|Tüccarı|Simyacısı|Şifacısı)$/)) {
+      // Rol isminden krallık ismini al
+      // Örneğin "👑 Roma Kralı" -> "Roma"
+      const krallikIsmi = role.name.split(' ').slice(1, -1).join(' '); 
+      if (krallikIsmi) kralliklarSet.add(krallikIsmi);
+    }
+  });
+
+  // Tüm krallıklar 10 toprakla sabit
+  const kralliklar = [...kralliklarSet];
+  if (kralliklar.length === 0) {
+    return interaction.reply({ content: 'Sunucuda herhangi bir krallık bulunamadı.', ephemeral: true });
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle('🗺️ Tüm Krallıkların Toprak Sayıları')
+    .setColor('Random');
+
+  kralliklar.forEach(k => {
+    embed.addFields({ name: `${k}`, value: `Toprak Sayısı: 10`, inline: true });
+  });
+
+  return interaction.reply({ embeds: [embed] });
+}
+
 
       case 'veliahtdevret': {
         await interaction.reply({ content: 'Veliaht devri komutu aktif değil.', ephemeral: true });
