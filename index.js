@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { Client, GatewayIntentBits, EmbedBuilder, Partials, PermissionsBitField } = require("discord.js");
+const { Client, GatewayIntentBits, EmbedBuilder, Partials } = require("discord.js");
 const fs = require("fs");
 
 const client = new Client({
@@ -25,7 +25,11 @@ function getUser(id) {
   return db[id];
 }
 
-client.on("ready", () => {
+function randomColor() {
+  return `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
+}
+
+client.once("ready", () => {
   console.log(`Bot hazır: ${client.user.tag}`);
 });
 
@@ -50,7 +54,8 @@ client.on("messageCreate", async (msg) => {
   }
 
   if (!msg.content.startsWith("/")) return;
-  const args = msg.content.slice(1).split(" ");
+
+  const args = msg.content.slice(1).trim().split(/\s+/);
   const cmd = args.shift().toLowerCase();
   const authorID = msg.author.id;
   const userData = getUser(authorID);
@@ -110,7 +115,9 @@ client.on("messageCreate", async (msg) => {
   }
 
   if (cmd === "terket") {
-    const rolesToRemove = msg.member.roles.cache.filter(r => r.name.toLowerCase().match(/kralı|padişahı|hanı|imparatoru|şahı|krallık|komutan|madenci|demirci|çiftçi|balıkçı|terzi|fırıncı|tüccar|simyacı|şifacı|avcısı/));
+    const rolesToRemove = msg.member.roles.cache.filter(r =>
+      /kralı|padişahı|hanı|imparatoru|şahı|krallık|komutan|madenci|demirci|çiftçi|balıkçı|terzi|fırıncı|tüccar|simyacı|şifacı|avcısı/i.test(r.name)
+    );
     msg.member.roles.remove(rolesToRemove).catch(console.error);
     userData.krallik = null;
     saveDB();
@@ -143,11 +150,9 @@ client.on("messageCreate", async (msg) => {
   }
 
 });
-
-function randomColor() {
-  return Math.floor(Math.random()*16777215).toString(16);
-}
-// --- PART 2 KOMUTLARI ---
+module.exports = { client, getUser, saveDB, randomColor };
+const { client, getUser, saveDB, randomColor } = require("./part1");
+const { EmbedBuilder } = require("discord.js");
 
 const meslekUretim = {
   "Çiftçi": { "Buğday": 2 },
@@ -172,12 +177,11 @@ const esyaFiyatlari = {
 
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot || !msg.content.startsWith("/")) return;
-  const args = msg.content.slice(1).split(" ");
+  const args = msg.content.slice(1).trim().split(/\s+/);
   const cmd = args.shift().toLowerCase();
   const userID = msg.author.id;
   const userData = getUser(userID);
 
-  // /çalış komutu
   if (cmd === "çalış") {
     if (!userData.meslek || !meslekUretim[userData.meslek]) {
       return msg.reply("Mesleğin yok ya da üretim desteklenmiyor.");
@@ -185,7 +189,7 @@ client.on("messageCreate", async (msg) => {
 
     const kazanc = meslekUretim[userData.meslek];
     const üretilen = [];
-    for (let item in kazanc) {
+    for (const item in kazanc) {
       if (!userData.envanter[item]) userData.envanter[item] = 0;
       userData.envanter[item] += kazanc[item];
       üretilen.push(`+${kazanc[item]} ${item}`);
@@ -203,9 +207,8 @@ client.on("messageCreate", async (msg) => {
     });
   }
 
-  // /envanterim komutu
   if (cmd === "envanterim") {
-    const envanter = userData.envanter;
+    const envanter = userData.envanter || {};
     const liste = Object.keys(envanter).length
       ? Object.entries(envanter).map(([k, v]) => `• ${k}: ${v}`).join("\n")
       : "Envanterin boş.";
@@ -220,447 +223,187 @@ client.on("messageCreate", async (msg) => {
     });
   }
 
-  // /sat <eşya> <adet>
   if (cmd === "sat") {
     const item = args[0];
     const miktar = parseInt(args[1]);
 
-    if (!item || isNaN(miktar)) return msg.reply("Kullanım: `/sat <eşya> <adet>`");
+    if (!item || isNaN(miktar)) return msg.reply("Kullanım: `/sat <eşya> <miktar>`");
     if (!userData.envanter[item] || userData.envanter[item] < miktar) {
-      return msg.reply("Bu kadar eşyan yok.");
+      return msg.reply("Yeterli eşyan yok.");
     }
+    if (!esyaFiyatlari[item]) return msg.reply("Bu eşya satılamaz.");
 
-    const fiyat = esyaFiyatlari[item];
-    if (!fiyat) return msg.reply("Bu eşya satılamaz.");
-
+    const fiyat = esyaFiyatlari[item] * miktar;
     userData.envanter[item] -= miktar;
-    if (userData.envanter[item] <= 0) delete userData.envanter[item];
-    userData.altin += fiyat * miktar;
+    userData.altin += fiyat;
     saveDB();
 
     msg.reply({
       embeds: [
         new EmbedBuilder()
-          .setTitle("💸 Satış Yapıldı")
-          .setDescription(`• ${item} x${miktar} satıldı.\n• Kazanç: ${fiyat * miktar} altın.`)
+          .setTitle("💰 Satış Başarılı")
+          .setDescription(`${miktar} ${item} sattın ve ${fiyat} altın kazandın.`)
           .setColor(randomColor())
       ]
     });
   }
 
-  // /ticaretyap @kullanıcı <eşya> <adet> <fiyat>
-  if (cmd === "ticaretyap") {
-    const target = msg.mentions.users.first();
+  if (cmd === "ticaret") {
+    const partner = msg.mentions.members.first();
+    if (!partner) return msg.reply("Lütfen ticaret yapacağın kişiyi etiketle.");
     const item = args[1];
     const miktar = parseInt(args[2]);
-    const fiyat = parseInt(args[3]);
 
-    if (!target || !item || isNaN(miktar) || isNaN(fiyat)) {
-      return msg.reply("Kullanım: `/ticaretyap @kullanıcı <eşya> <adet> <fiyat>`");
-    }
-    if (!userData.envanter[item] || userData.envanter[item] < miktar) {
-      return msg.reply("Bu kadar eşyan yok.");
-    }
+    if (!item || isNaN(miktar)) return msg.reply("Kullanım: `/ticaret @kullanıcı <eşya> <miktar>`");
 
-    const teklifEmbed = new EmbedBuilder()
-      .setTitle("🤝 Ticaret Teklifi")
-      .setDescription(`${msg.author} sana ${miktar}x **${item}** satmak istiyor.\nFiyat: ${fiyat} altın`)
-      .setFooter({ text: "Kabul etmek için: ✅ | Reddetmek için: ❌" })
-      .setColor(randomColor());
+    const userEnvanter = userData.envanter || {};
+    if (!userEnvanter[item] || userEnvanter[item] < miktar) return msg.reply("Yeterli eşyan yok.");
 
-    const ticaretMsg = await msg.channel.send({ content: `${target}`, embeds: [teklifEmbed] });
-    await ticaretMsg.react("✅");
-    await ticaretMsg.react("❌");
+    const partnerData = getUser(partner.id);
+    if (!partnerData.envanter[item]) partnerData.envanter[item] = 0;
 
-    const filter = (reaction, user) => ["✅", "❌"].includes(reaction.emoji.name) && user.id === target.id;
-    ticaretMsg.awaitReactions({ filter, max: 1, time: 30000 }).then(collected => {
-      const reaction = collected.first();
-      const buyerData = getUser(target.id);
+    userEnvanter[item] -= miktar;
+    partnerData.envanter[item] += miktar;
+    saveDB();
 
-      if (reaction.emoji.name === "✅") {
-        if (buyerData.altin < fiyat) {
-          return msg.channel.send(`${target} yeterli altının yok!`);
-        }
-        // işlem
-        userData.envanter[item] -= miktar;
-        if (userData.envanter[item] <= 0) delete userData.envanter[item];
+    msg.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle("🤝 Ticaret Başarılı")
+          .setDescription(`${miktar} ${item} ${partner.user.tag}'a gönderildi.`)
+          .setColor(randomColor())
+      ]
+    });
+  }
+});
+const { client, getUser, saveDB, randomColor } = require("./part1");
+const { EmbedBuilder } = require("discord.js");
 
-        if (!buyerData.envanter[item]) buyerData.envanter[item] = 0;
-        buyerData.envanter[item] += miktar;
+// Asker tipleri ve özellikleri
+const askerTipleri = {
+  kılıç: { güç: 5, maliyet: 10 },
+  okçu: { güç: 3, maliyet: 8 },
+  atlı: { güç: 7, maliyet: 15 }
+};
 
-        userData.altin += fiyat;
-        buyerData.altin -= fiyat;
+client.on("messageCreate", async (msg) => {
+  if (msg.author.bot || !msg.content.startsWith("/")) return;
 
-        saveDB();
-        msg.channel.send(`✅ Ticaret başarıyla tamamlandı.`);
-      } else {
-        msg.channel.send("❌ Ticaret reddedildi.");
-      }
-    }).catch(() => {
-      msg.channel.send("⏱️ Süre doldu, ticaret iptal edildi.");
+  const args = msg.content.slice(1).trim().split(/\s+/);
+  const cmd = args.shift().toLowerCase();
+  const userID = msg.author.id;
+  const userData = getUser(userID);
+
+  if (cmd === "askeral") {
+    const tip = args[0];
+    const miktar = parseInt(args[1]);
+    if (!tip || !askerTipleri[tip]) return msg.reply("Geçerli asker tipi giriniz (kılıç, okçu, atlı).");
+    if (isNaN(miktar) || miktar < 1) return msg.reply("Geçerli miktar giriniz.");
+
+    const toplamMaliyet = askerTipleri[tip].maliyet * miktar;
+    if (userData.altin < toplamMaliyet) return msg.reply("Yeterli altının yok.");
+
+    if (!userData.envanter) userData.envanter = {};
+    if (!userData.envanter[tip]) userData.envanter[tip] = 0;
+
+    userData.envanter[tip] += miktar;
+    userData.altin -= toplamMaliyet;
+    saveDB();
+
+    msg.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle("🛡️ Asker Alındı")
+          .setDescription(`${miktar} adet ${tip} askeri satın aldın.`)
+          .setColor(randomColor())
+      ]
     });
   }
 
-});
-// --- PART 3: Asker, Krallık, Savaş ---
+  if (cmd === "savaş") {
+    const hedef = msg.mentions.members.first();
+    if (!hedef) return msg.reply("Savaşmak için birisini etiketle.");
 
-// /askeroluştur <tür> <adet>
-if (cmd === "askeroluştur") {
-  const tip = args[0];
-  const adet = parseInt(args[1]);
+    if (hedef.user.bot) return msg.reply("Botlara savaş açamazsın.");
+    if (hedef.id === userID) return msg.reply("Kendinle savaşamazsın.");
 
-  if (!askerTipleri[tip]) return msg.reply("Geçersiz asker türü. (kılıç, okçu, atlı)");
-  if (isNaN(adet) || adet <= 0) return msg.reply("Geçerli bir adet gir.");
+    const rakipData = getUser(hedef.id);
 
-  const toplamMaliyet = askerTipleri[tip].maliyet * adet;
-  if (userData.altin < toplamMaliyet) return msg.reply("Yeterli altının yok.");
+    // Kullanıcının asker gücü
+    const kullaniciAsker = userData.envanter || {};
+    const rakipAsker = rakipData.envanter || {};
 
-  userData.altin -= toplamMaliyet;
-  if (!userData.ordu) userData.ordu = {};
-  userData.ordu[tip] = (userData.ordu[tip] || 0) + adet;
-  saveDB();
+    let kullaniciGuc = 0;
+    let rakipGuc = 0;
 
-  msg.reply(`✅ ${adet} adet ${tip} askeri oluşturuldu.`);
-}
+    for (const tip in askerTipleri) {
+      kullaniciGuc += (kullaniciAsker[tip] || 0) * askerTipleri[tip].güç;
+      rakipGuc += (rakipAsker[tip] || 0) * askerTipleri[tip].güç;
+    }
 
-// /ordum
-if (cmd === "ordum") {
-  const ordu = userData.ordu || {};
-  const liste = Object.entries(ordu).map(([k, v]) => `• ${k}: ${v}`).join("\n") || "Ordun yok.";
+    if (kullaniciGuc === 0) return msg.reply("Senin askerlerin yok.");
+    if (rakipGuc === 0) return msg.reply("Rakibin askerleri yok.");
 
-  msg.reply({
-    embeds: [
-      new EmbedBuilder()
-        .setTitle("🛡️ Ordun")
-        .setDescription(liste)
-        .setColor(randomColor())
-    ]
-  });
-}
+    // Basit savaş sonucu
+    let kazanan, kaybeden;
+    if (kullaniciGuc > rakipGuc) {
+      kazanan = msg.author;
+      kaybeden = hedef.user;
+    } else if (rakipGuc > kullaniciGuc) {
+      kazanan = hedef.user;
+      kaybeden = msg.author;
+    } else {
+      return msg.reply("Savaş berabere bitti!");
+    }
 
-// /savaş @kullanıcı
-if (cmd === "savaş") {
-  const target = msg.mentions.users.first();
-  if (!target) return msg.reply("Bir kullanıcı etiketle.");
-  if (target.id === userID) return msg.reply("Kendinle savaşamazsın.");
+    // Kaybedenin askerlerinin %50'si yok olur
+    for (const tip in askerTipleri) {
+      if (kaybeden.id === userID) {
+        userData.envanter[tip] = Math.max(0, (userData.envanter[tip] || 0) - Math.floor((userData.envanter[tip] || 0) * 0.5));
+      } else if (kaybeden.id === hedef.id) {
+        rakipData.envanter[tip] = Math.max(0, (rakipData.envanter[tip] || 0) - Math.floor((rakipData.envanter[tip] || 0) * 0.5));
+      }
+    }
 
-  const savasci = getUser(userID);
-  const hedef = getUser(target.id);
-
-  const savasGucu = (user) => {
-    return Object.entries(user.ordu || {})
-      .reduce((toplam, [tip, adet]) => toplam + (adet * askerTipleri[tip].güç), 0);
-  };
-
-  const seninGuc = savasGucu(savasci);
-  const hedefGuc = savasGucu(hedef);
-
-  let sonuc = "";
-  if (seninGuc > hedefGuc) {
-    const ganimet = Math.floor(hedef.altin * 0.2);
-    savasci.altin += ganimet;
-    hedef.altin -= ganimet;
-    sonuc = `${msg.author} savaşı kazandı! 💰 ${ganimet} altın yağmalandı.`;
-  } else if (seninGuc < hedefGuc) {
-    const ganimet = Math.floor(savasci.altin * 0.2);
-    hedef.altin += ganimet;
-    savasci.altin -= ganimet;
-    sonuc = `${target} savaşı kazandı! 💰 ${ganimet} altın yağmalandı.`;
-  } else {
-    sonuc = "⚔️ Savaş berabere bitti. Kimse üstünlük kuramadı.";
-  }
-
-  saveDB();
-  msg.channel.send(`🪖 **Savaş Raporu**\n${sonuc}`);
-}
-
-// /krallıkoluştur <isim>
-if (cmd === "krallıkoluştur") {
-  const isim = args.join(" ");
-  if (!isim) return msg.reply("Krallık ismini gir.");
-  if (userData.krallik) return msg.reply("Zaten bir krallığa bağlısın.");
-
-  userData.krallik = isim;
-  userData.krallikRol = "kral";
-  saveDB();
-  msg.reply(`👑 ${isim} adlı krallık kuruldu. Tebrikler kral!`);
-}
-
-// /krallığım
-if (cmd === "krallığım") {
-  if (!userData.krallik) return msg.reply("Bir krallığa bağlı değilsin.");
-  msg.reply(`🏰 Krallık: ${userData.krallik}\n👑 Rol: ${userData.krallikRol || "vatandaş"}`);
-}
-
-// /vergiayarla <oran>
-if (cmd === "vergiayarla") {
-  const oran = parseFloat(args[0]);
-  if (userData.krallikRol !== "kral") return msg.reply("Sadece kral vergiyi ayarlayabilir.");
-  if (isNaN(oran) || oran < 0 || oran > 1) return msg.reply("0 ile 1 arasında bir oran gir (örn: 0.2)");
-
-  userData.vergi = oran;
-  saveDB();
-  msg.reply(`📊 Vergi oranı %${oran * 100} olarak ayarlandı.`);
-}
-
-// /isyanyap
-if (cmd === "isyanyap") {
-  if (!userData.krallik || userData.krallikRol === "kral") return msg.reply("İsyan edemezsin.");
-  const sans = Math.random();
-  if (sans > 0.5) {
-    userData.krallik = null;
-    userData.krallikRol = null;
     saveDB();
-    msg.reply("🔥 İsyan başarılı! Artık özgürsün.");
-  } else {
-    msg.reply("❌ İsyan başarısız oldu. Krallık seni bastırdı.");
-  }
-}
-const gorevler = [
-  { id: 1, aciklama: "10 altın kazan", kontrol: (u) => u.altin >= 10, ödül: 20 },
-  { id: 2, aciklama: "5 asker oluştur", kontrol: (u) => {
-    const o = u.ordu || {};
-    return Object.values(o).reduce((t, a) => t + a, 0) >= 5;
-  }, ödül: 30 },
-  { id: 3, aciklama: "Bir savaş kazan", kontrol: (u) => u.gorev_kazandi, ödül: 50 },
-];
-// /görev
-if (cmd === "görev") {
-  const tamamlanan = userData.tamamlananGorevler || [];
-  const liste = gorevler.map(g => {
-    const durum = tamamlanan.includes(g.id) ? "✅" : "🕒";
-    return `${durum} [${g.id}] ${g.aciklama} → Ödül: ${g.ödül} altın`;
-  }).join("\n");
 
-  msg.reply({
-    embeds: [
-      new EmbedBuilder()
-        .setTitle("📜 Günlük Görevler")
-        .setDescription(liste)
-        .setColor(randomColor())
-    ]
-  });
-}
-
-// /göreval <id>
-if (cmd === "göreval") {
-  const id = parseInt(args[0]);
-  const gorev = gorevler.find(g => g.id === id);
-  if (!gorev) return msg.reply("Geçersiz görev ID.");
-  
-  if (!gorev.kontrol(userData)) return msg.reply("Görev şartları henüz sağlanmadı.");
-  userData.tamamlananGorevler = userData.tamamlananGorevler || [];
-  if (userData.tamamlananGorevler.includes(id)) return msg.reply("Bu görevi zaten tamamladın.");
-
-  userData.altin += gorev.ödül;
-  userData.tamamlananGorevler.push(id);
-  saveDB();
-
-  msg.reply(`🎉 Görev tamamlandı! ${gorev.ödül} altın kazandın.`);
-}
-const siniflar = {
-  "şövalye": { bonus: "asker", açıklama: "Ordun %10 daha güçlü." },
-  "büyücü": { bonus: "gelir", açıklama: "Gelirlerin %15 artar." },
-  "hırsız": { bonus: "yağma", açıklama: "Savaşta %20 daha fazla altın çalarsın." }
-};
-// /sınıfseç <sınıf>
-if (cmd === "sınıfseç") {
-  const sinif = args[0]?.toLowerCase();
-  if (!siniflar[sinif]) return msg.reply("Geçersiz sınıf. (şövalye, büyücü, hırsız)");
-  if (userData.sinif) return msg.reply("Sınıfın zaten seçilmiş, değiştirilemez.");
-
-  userData.sinif = sinif;
-  saveDB();
-  msg.reply(`🧬 ${sinif.toUpperCase()} sınıfına katıldın. ${siniflar[sinif].açıklama}`);
-}
-
-// /sınıfım
-if (cmd === "sınıfım") {
-  const s = userData.sinif;
-  if (!s) return msg.reply("Henüz bir sınıf seçmedin.");
-  msg.reply(`🧪 Sınıfın: ${s.toUpperCase()} → ${siniflar[s].açıklama}`);
-}
-let ganimet = Math.floor(hedef.altin * 0.2);
-if (savasci.sinif === "hırsız") ganimet = Math.floor(ganimet * 1.2);
-let gelir = Math.floor(...);
-if (userData.sinif === "büyücü") gelir = Math.floor(gelir * 1.15);
-const savasGucu = (user) => {
-  let toplam = Object.entries(user.ordu || {})
-    .reduce((t, [tip, adet]) => t + (adet * askerTipleri[tip].güç), 0);
-  if (user.sinif === "şövalye") toplam = Math.floor(toplam * 1.1);
-  return toplam;
-};
-const bolgeler = [
-  { id: 1, ad: "Yeşilova", gelir: 10 },
-  { id: 2, ad: "Karakış", gelir: 15 },
-  { id: 3, ad: "Altındere", gelir: 20 },
-  { id: 4, ad: "Kızıltepe", gelir: 25 },
-  { id: 5, ad: "Buzyayla", gelir: 30 },
-];
-if (cmd === "bölgem") {
-  const sahip = userData.bolgeler || [];
-  if (sahip.length === 0) return msg.reply("Hiç bölgen yok.");
-  
-  const liste = sahip.map(id => {
-    const b = bolgeler.find(x => x.id === id);
-    return `🏞️ ${b.ad} → +${b.gelir} altın/gelir`;
-  }).join("\n");
-
-  msg.reply({
-    embeds: [
-      new EmbedBuilder()
-        .setTitle("📍 Sahip Olduğun Bölgeler")
-        .setDescription(liste)
-        .setColor(randomColor())
-    ]
-  });
-}
-if (cmd === "fethet") {
-  const id = parseInt(args[0]);
-  const bolge = bolgeler.find(b => b.id === id);
-  if (!bolge) return msg.reply("Böyle bir bölge yok.");
-
-  userData.bolgeler = userData.bolgeler || [];
-  if (userData.bolgeler.includes(id)) return msg.reply("Bu bölge zaten senin.");
-
-  const ordun = Object.entries(userData.ordu || {}).reduce((t, [tip, adet]) => t + adet, 0);
-  if (ordun < 5) return msg.reply("En az 5 asker gerekli.");
-
-  const sans = Math.random();
-  if (sans < 0.6) {
-    return msg.reply("❌ Fetih başarısız oldu. Daha güçlü bir ordu ile tekrar dene.");
+    msg.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle("⚔️ Savaş Sonucu")
+          .setDescription(`${kazanan.tag} savaşı kazandı!\n${kaybeden.tag} askerlerinin yarısı kayboldu.`)
+          .setColor(randomColor())
+      ]
+    });
   }
 
-  userDat
-let gelir = 0;
-if (userData.bolgeler?.length) {
-  for (const id of userData.bolgeler) {
-    const bolge = bolgeler.find(b => b.id === id);
-    gelir += bolge.gelir;
+  if (cmd === "ittifak") {
+    const isim = args.join(" ");
+    if (!isim) return msg.reply("Lütfen ittifak ismi girin.");
+    userData.ittifak = isim;
+    saveDB();
+    msg.reply(`İttifakın başarıyla '${isim}' olarak ayarlandı.`);
   }
-}
 
-if (userData.sinif === "büyücü") gelir = Math.floor(gelir * 1.15);
-userData.altin += gelir;
-userData.ittifak = userData.ittifak || null; // ittifak adı
-userData.bolgeler = userData.bolgeler || [];
-if (cmd === "ittifak-kur") {
-  const ad = args.join(" ");
-  if (!ad) return msg.reply("İttifak ismi belirt.");
-  if (userData.ittifak) return msg.reply("Zaten bir ittifaka aitsin.");
+  if (cmd === "günlük") {
+    if (!userData.sonGünlük) userData.sonGünlük = 0;
+    const now = Date.now();
+    if (now - userData.sonGünlük < 24 * 60 * 60 * 1000) {
+      return msg.reply("Günlük ödülünü zaten aldın, 24 saat bekle.");
+    }
+    const gelir = Math.floor(Math.random() * 50) + 50;
+    userData.altin += gelir;
+    userData.sonGünlük = now;
+    saveDB();
 
-  const mevcut = db.filter(u => u.ittifak === ad);
-  if (mevcut.length > 0) return msg.reply("Bu isimde bir ittifak zaten var.");
-
-  userData.ittifak = ad;
-  saveDB();
-  msg.reply(`✅ "${ad}" adında bir ittifak kurdun.`);
-}
-if (cmd === "ittifak-katıl") {
-  const hedef = msg.mentions.users.first();
-  if (!hedef) return msg.reply("Birini etiketlemelisin.");
-
-  const hedefData = db[hedef.id];
-  if (!hedefData?.ittifak) return msg.reply("Bu oyuncunun bir ittifakı yok.");
-  if (userData.ittifak) return msg.reply("Zaten bir ittifaktasın.");
-
-  userData.ittifak = hedefData.ittifak;
-  saveDB();
-  msg.reply(`✅ "${hedefData.ittifak}" ittifakına katıldın.`);
-}
-userData.savaslar = userData.savaslar || []; // aktifle savaşta olunan oyuncuların ID'leri
-if (cmd === "savaş") {
-  const hedef = msg.mentions.users.first();
-  if (!hedef || hedef.id === msg.author.id) return msg.reply("Geçerli bir hedef belirt.");
-  
-  const hedefData = db[hedef.id];
-  if (!hedefData) return msg.reply("Bu kullanıcı kayıtlı değil.");
-
-  if (userData.savaslar?.includes(hedef.id)) return msg.reply("Zaten savaş halindesiniz.");
-
-  userData.savaslar = userData.savaslar || [];
-  hedefData.savaslar = hedefData.savaslar || [];
-
-  userData.savaslar.push(hedef.id);
-  hedefData.savaslar.push(msg.author.id);
-  saveDB();
-
-  msg.reply(`⚔️ ${hedef.username} ile savaşa girdin!`);
-}
-if (cmd === "barış") {
-  const hedef = msg.mentions.users.first();
-  if (!hedef) return msg.reply("Birini etiketle.");
-
-  const hedefData = db[hedef.id];
-  if (!hedefData?.savaslar?.includes(msg.author.id)) return msg.reply("Bu kişiyle savaşta değilsiniz.");
-
-  userData.savaslar = userData.savaslar.filter(id => id !== hedef.id);
-  hedefData.savaslar = hedefData.savaslar.filter(id => id !== msg.author.id);
-  saveDB();
-
-  msg.reply(`🤝 ${hedef.username} ile barış yaptınız.`);
-}
-// Kullanıcı verisine ekle
-userData.envanter = userData.envanter || []; 
-// Örnek envanter: [{id: 'kılıç', isim: 'Demir Kılıç', hasar: 10, adet: 1}]
-const esyaListesi = {
-  kilic: { isim: "Demir Kılıç", tur: "silah", hasar: 10 },
-  yari: { isim: "Uzun Yarı", tur: "silah", hasar: 15 },
-  zırh: { isim: "Derin Zırh", tur: "zirh", dayanıklilik: 20 },
-  sifaIksiri: { isim: "Şifa İksiri", tur: "tüketilebilir", iyilesme: 50 }
-};
-if (cmd === "esya-ekle") {
-  const esyaId = args[0];
-  if (!esyaListesi[esyaId]) return msg.reply("Böyle bir eşya yok.");
-
-  let esya = userData.envanter.find(e => e.id === esyaId);
-  if (esya) {
-    esya.adet++;
-  } else {
-    userData.envanter.push({ ...esyaListesi[esyaId], id: esyaId, adet: 1 });
+    msg.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle("🎁 Günlük Ödül")
+          .setDescription(`Bugünkü altın ödülünü aldın: **${gelir}**`)
+          .setColor(randomColor())
+      ]
+    });
   }
-  saveDB();
-  msg.reply(`${esyaListesi[esyaId].isim} envanterine eklendi!`);
-}
-if (cmd === "envanter") {
-  if (!userData.envanter.length) return msg.reply("Envanterin boş.");
-  let liste = userData.envanter.map(e => `${e.isim} x${e.adet}`).join("\n");
-  msg.reply(`👜 Envanterin:\n${liste}`);
-}
-userData.ekipman = userData.ekipman || { silah: null, zirh: null };
-if (cmd === "tak") {
-  const esyaId = args[0];
-  const esya = userData.envanter.find(e => e.id === esyaId);
-  if (!esya) return msg.reply("Envanterinde böyle bir eşya yok.");
-  if (esya.tur !== "silah" && esya.tur !== "zirh") return msg.reply("Bu eşyayı takamazsın.");
-
-  userData.ekipman[esya.tur] = esyaId;
-  saveDB();
-  msg.reply(`${esya.isim} takıldı.`);
-}
-if (cmd === "ekipman") {
-  const silahId = userData.ekipman.silah;
-  const zirhId = userData.ekipman.zirh;
-
-  const silah = silahId ? esyaListesi[silahId]?.isim : "Takılı silah yok";
-  const zirh = zirhId ? esyaListesi[zirhId]?.isim : "Takılı zırh yok";
-
-  msg.reply(`🎯 Ekipmanın:\nSilah: ${silah}\nZırh: ${zirh}`);
-}
-if (cmd === "kullan") {
-  const esyaId = args[0];
-  const esya = userData.envanter.find(e => e.id === esyaId);
-  if (!esya) return msg.reply("Envanterinde böyle bir eşya yok.");
-  if (esya.tur !== "tüketilebilir") return msg.reply("Bu eşyayı kullanamazsın.");
-
-  // Canı arttır (örnek, oyuncunun canı olabilir)
-  userData.can = Math.min(userData.canMax, (userData.can || userData.canMax) + esya.iyilesme);
-
-  esya.adet--;
-  if (esya.adet <= 0) userData.envanter = userData.envanter.filter(e => e.id !== esyaId);
-  
-  saveDB();
-  msg.reply(`${esya.isim} kullanıldı. Canın: ${userData.can}/${userData.canMax}`);
-}
-
-client.login(process.env.TOKEN);
+});
+client.login(process.env.TOKEN)
