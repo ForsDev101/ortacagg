@@ -1,15 +1,18 @@
 {
-  "name": "krallik-discord-bot",
+  "name": "rpg-bot",
   "version": "1.0.0",
-  "description": "Krallık temalı Discord botu",
+  "description": "Discord RPG botu",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
-  "author": "SeninAdin",
+  "author": "Senin İsmin",
   "license": "MIT",
   "dependencies": {
-    "discord.js": "^14.11.0",
-    "dotenv": "^16.3.1"
+    "discord.js": "^14.11.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
   }
 }
