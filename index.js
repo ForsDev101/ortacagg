@@ -71,7 +71,7 @@ function embedMesaj(description, color = 0x00ff00) {
 // Yetki kontrol fonksiyonu örneği
 function yetkiKontrol(interaction, roller) {
   if (!roller.some(r => interaction.member.roles.cache.some(role => role.name === r))) {
-    interaction.reply({ embeds: [embedMesaj('Bu komutu kullanmak için yetkiniz yok.', 0xff0000)], ephemeral: true });
+    interaction.reply({ embeds: [embedMesaj('Bu komutu kullanmak için yetkiniz yok.', 0xff0000)], ephemeral: false});
     return false;
   }
   return true;
@@ -125,7 +125,7 @@ client.on('interactionCreate', async interaction => {
               '`/dm (@kişi) (mesaj)` - DM atar\n'
             )
             .setFooter({ text: 'Bot tarafından sağlanmıştır.' });
-          await interaction.reply({ embeds: [embed], ephemeral: true });
+          await interaction.reply({ embeds: [embed], ephemeral: false });
         }
         break;
 
@@ -140,18 +140,18 @@ client.on('interactionCreate', async interaction => {
           if (meslek) {
             const meslekRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === meslek.toLowerCase());
             if (meslekRole) await member.roles.add(meslekRole);
-            else return interaction.reply({ content: 'Meslek rolü bulunamadı.', ephemeral: true });
+            else return interaction.reply({ content: 'Meslek rolü bulunamadı.', ephemeral: false });
           }
 
           if (krallik) {
             const krallikRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === krallik.toLowerCase());
             if (krallikRole) await member.roles.add(krallikRole);
-            else return interaction.reply({ content: 'Krallık rolü bulunamadı.', ephemeral: true });
+            else return interaction.reply({ content: 'Krallık rolü bulunamadı.', ephemeral: false });
           }
 
-          await interaction.reply({ content: `Başarıyla kayıt yapıldı!`, ephemeral: true });
+          await interaction.reply({ content: `Başarıyla kayıt yapıldı!`, ephemeral: false });
         } catch (err) {
-          await interaction.reply({ content: `Bir hata oluştu: ${err.message}`, ephemeral: true });
+          await interaction.reply({ content: `Bir hata oluştu: ${err.message}`, ephemeral: false});
         }
         break;
       }
@@ -162,9 +162,9 @@ client.on('interactionCreate', async interaction => {
         const krallikRolleri = member.roles.cache.filter(r => r.name.includes('Krallık') || r.name.includes('krallık'));
         try {
           await member.roles.remove(krallikRolleri);
-          await interaction.reply({ content: 'Krallıktan ayrıldınız.', ephemeral: true });
+          await interaction.reply({ content: 'Krallıktan ayrıldınız.', ephemeral: false });
         } catch (err) {
-          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: true });
+          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: false });
         }
         break;
       }
@@ -198,7 +198,7 @@ client.on('interactionCreate', async interaction => {
         const kisi = interaction.options.getUser('kişi');
         const miktar = interaction.options.getInteger('miktar');
 
-        if (!kisi || miktar <= 0) return interaction.reply({ content: 'Geçerli kullanıcı ve miktar giriniz.', ephemeral: true });
+        if (!kisi || miktar <= 0) return interaction.reply({ content: 'Geçerli kullanıcı ve miktar giriniz.', ephemeral: false });
 
         const userData = users.get(kisi.id) || { altin: 0 };
         userData.altin += miktar;
@@ -214,7 +214,7 @@ client.on('interactionCreate', async interaction => {
         const kisi = interaction.options.getUser('kişi');
         const miktar = interaction.options.getInteger('miktar');
 
-        if (!kisi || miktar <= 0) return interaction.reply({ content: 'Geçerli kullanıcı ve miktar giriniz.', ephemeral: true });
+        if (!kisi || miktar <= 0) return interaction.reply({ content: 'Geçerli kullanıcı ve miktar giriniz.', ephemeral: false });
 
         const userData = users.get(kisi.id) || { altin: 0 };
         userData.altin -= miktar;
@@ -231,17 +231,17 @@ client.on('interactionCreate', async interaction => {
         const kisi = interaction.options.getMember('kişi');
         const rol = interaction.options.getRole('rol');
 
-        if (!kisi || !rol) return interaction.reply({ content: 'Kullanıcı veya rol bulunamadı.', ephemeral: true });
+        if (!kisi || !rol) return interaction.reply({ content: 'Kullanıcı veya rol bulunamadı.', ephemeral: false });
 
         if (kisi.roles.cache.size >= 5) {
-          return interaction.reply({ content: 'Bir kullanıcı en fazla 5 role sahip olabilir.', ephemeral: true });
+          return interaction.reply({ content: 'Bir kullanıcı en fazla 5 role sahip olabilir.', ephemeral: false });
         }
 
         try {
           await kisi.roles.add(rol);
           await interaction.reply({ embeds: [embedMesaj(`${kisi.user.tag} kullanıcısına ${rol.name} rolü verildi.`)] });
         } catch (err) {
-          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: true });
+          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: false });
         }
         break;
       }
@@ -256,7 +256,7 @@ client.on('interactionCreate', async interaction => {
           krallik = krallikRole ? krallikRole.name : null;
         }
 
-        if (!krallik) return interaction.reply({ content: 'Krallık belirtilmedi ve krallık rolü bulunamadı.', ephemeral: true });
+        if (!krallik) return interaction.reply({ content: 'Krallık belirtilmedi ve krallık rolü bulunamadı.', ephemeral: false });
 
         const altin = krallikAltin.get(krallik) || 0;
 
@@ -270,7 +270,7 @@ client.on('interactionCreate', async interaction => {
         const kisi = interaction.options.getUser('kişi');
         const sebep = interaction.options.getString('sebep');
 
-        if (!kisi) return interaction.reply({ content: 'Kullanıcı bulunamadı.', ephemeral: true });
+        if (!kisi) return interaction.reply({ content: 'Kullanıcı bulunamadı.', ephemeral: false });
 
         const member = await interaction.guild.members.fetch(kisi.id);
         // Krallık rollerini kaldır
@@ -279,7 +279,7 @@ client.on('interactionCreate', async interaction => {
           await member.roles.remove(krallikRolleri);
           await interaction.reply({ content: `${kisi.tag} krallıktan atıldı. Sebep: ${sebep}` });
         } catch (err) {
-          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: true });
+          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: false });
         }
         break;
       }
@@ -287,7 +287,7 @@ client.on('interactionCreate', async interaction => {
       case 'savaşbaşlat': {
         if (!yetkiKontrol(interaction, ['Admin', 'Founder'])) return;
 
-        if (aktifSavas.aktif) return interaction.reply({ content: 'Zaten aktif bir savaş var.', ephemeral: true });
+        if (aktifSavas.aktif) return interaction.reply({ content: 'Zaten aktif bir savaş var.', ephemeral: false });
 
         aktifSavas.aktif = true;
         await interaction.reply({ content: 'Genel savaş başlatıldı!' });
@@ -297,7 +297,7 @@ client.on('interactionCreate', async interaction => {
       case 'savaşbitir': {
         if (!yetkiKontrol(interaction, ['Admin', 'Founder'])) return;
 
-        if (!aktifSavas.aktif) return interaction.reply({ content: 'Aktif savaş yok.', ephemeral: true });
+        if (!aktifSavas.aktif) return interaction.reply({ content: 'Aktif savaş yok.', ephemeral: false });
 
         aktifSavas.aktif = false;
         await interaction.reply({ content: 'Genel savaş sona erdi!' });
@@ -309,13 +309,13 @@ client.on('interactionCreate', async interaction => {
         const member = interaction.member;
         const meslekRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === meslek.toLowerCase());
 
-        if (!meslekRole) return interaction.reply({ content: 'Meslek rolü bulunamadı.', ephemeral: true });
+        if (!meslekRole) return interaction.reply({ content: 'Meslek rolü bulunamadı.', ephemeral: false });
 
         try {
           await member.roles.add(meslekRole);
           await interaction.reply({ content: `Başarıyla ${meslekRole.name} rolü alındı.` });
         } catch (err) {
-          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: true });
+          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: false });
         }
         break;
       }
@@ -324,7 +324,7 @@ client.on('interactionCreate', async interaction => {
         const memberRoles = interaction.member.roles.cache;
         const meslekRole = memberRoles.find(r => ['Çiftçi', 'Madenci', 'Demirci', 'Kasap'].some(m => r.name.toLowerCase() === m.toLowerCase()));
 
-        if (!meslekRole) return interaction.reply({ content: 'Meslek rolünüz bulunamadı.', ephemeral: true });
+        if (!meslekRole) return interaction.reply({ content: 'Meslek rolünüz bulunamadı.', ephemeral: false });
 
         await interaction.reply({ content: `Mesleğiniz: ${meslekRole.name}` });
         break;
@@ -336,7 +336,7 @@ client.on('interactionCreate', async interaction => {
 
         const meslekRole = interaction.member.roles.cache.find(r => ['Çiftçi', 'Madenci', 'Demirci', 'Kasap'].includes(r.name));
 
-        if (!meslekRole) return interaction.reply({ content: 'Önce meslek rolü almalısınız.', ephemeral: true });
+        if (!meslekRole) return interaction.reply({ content: 'Önce meslek rolü almalısınız.', ephemeral: false });
 
         // Basit çalışma simülasyonu
         const kazanilanAltin = Math.floor(Math.random() * 50) + 10;
@@ -354,21 +354,21 @@ client.on('interactionCreate', async interaction => {
         const miktar = interaction.options.getInteger('miktar');
         const fiyat = interaction.options.getInteger('fiyat');
 
-        if (!kisi || miktar <= 0 || fiyat <= 0) return interaction.reply({ content: 'Geçerli kullanıcı, miktar ve fiyat giriniz.', ephemeral: true });
+        if (!kisi || miktar <= 0 || fiyat <= 0) return interaction.reply({ content: 'Geçerli kullanıcı, miktar ve fiyat giriniz.', ephemeral: false });
 
         // Basit örnek: ticaret isteği DM olarak gönderiliyor
         try {
           await kisi.send(`Bir ticaret isteği aldınız: ${interaction.user.tag} size ${miktar} adet ${esyaKodu} karşılığı ${fiyat} altın teklif ediyor.`);
           await interaction.reply({ content: 'Ticaret isteği gönderildi.' });
         } catch {
-          await interaction.reply({ content: 'Kullanıcı DM kapalı olabilir.', ephemeral: true });
+          await interaction.reply({ content: 'Kullanıcı DM kapalı olabilir.', ephemeral: false });
         }
         break;
       }
 
       case 'envanterim': {
         // Kullanıcının envanteri
-        await interaction.reply({ content: 'Bu özellik yakında eklenecek.', ephemeral: true });
+        await interaction.reply({ content: 'Bu özellik yakında eklenecek.', ephemeral: false });
         break;
       }
 
@@ -376,13 +376,13 @@ client.on('interactionCreate', async interaction => {
         // Asker oluşturma örneği (rol verme)
         const member = interaction.member;
         const askerRol = interaction.guild.roles.cache.find(r => r.name === 'Asker');
-        if (!askerRol) return interaction.reply({ content: 'Asker rolü bulunamadı.', ephemeral: true });
+        if (!askerRol) return interaction.reply({ content: 'Asker rolü bulunamadı.', ephemeral: false });
 
         try {
           await member.roles.add(askerRol);
           await interaction.reply({ content: 'Asker rolü verildi.' });
         } catch (err) {
-          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: true });
+          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: false });
         }
         break;
       }
@@ -392,7 +392,7 @@ client.on('interactionCreate', async interaction => {
         const askerSayisi = interaction.options.getInteger('asker_sayısı');
         const bolum = interaction.options.getInteger('bölüm');
 
-        if (!aktifSavas.aktif) return interaction.reply({ content: 'Şu anda savaş aktif değil.', ephemeral: true });
+        if (!aktifSavas.aktif) return interaction.reply({ content: 'Şu anda savaş aktif değil.', ephemeral: false });
 
         await interaction.reply({ content: `${krallik} krallığına ${askerSayisi} askerle baskın düzenlendi (Bölüm: ${bolum}).` });
         break;
@@ -403,7 +403,7 @@ client.on('interactionCreate', async interaction => {
         const askerSayisi = interaction.options.getInteger('asker_sayısı');
         const bolum = interaction.options.getInteger('bölüm');
 
-        if (!aktifSavas.aktif) return interaction.reply({ content: 'Şu anda savaş aktif değil.', ephemeral: true });
+        if (!aktifSavas.aktif) return interaction.reply({ content: 'Şu anda savaş aktif değil.', ephemeral: false });
 
         await interaction.reply({ content: `${krallik} krallığına ${askerSayisi} askerle saldırı yapıldı (Bölüm: ${bolum}).` });
         break;
@@ -413,7 +413,7 @@ client.on('interactionCreate', async interaction => {
         const krallik = interaction.options.getString('krallık');
         const askerSayisi = interaction.options.getInteger('asker_sayısı');
 
-        if (!aktifSavas.aktif) return interaction.reply({ content: 'Şu anda savaş aktif değil.', ephemeral: true });
+        if (!aktifSavas.aktif) return interaction.reply({ content: 'Şu anda savaş aktif değil.', ephemeral: false });
 
         await interaction.reply({ content: `${krallik} krallığında ${askerSayisi} askerle isyan çıkarıldı.` });
         break;
@@ -437,7 +437,7 @@ client.on('interactionCreate', async interaction => {
   // Tüm krallıklar 10 toprakla sabit
   const kralliklar = [...kralliklarSet];
   if (kralliklar.length === 0) {
-    return interaction.reply({ content: 'Sunucuda herhangi bir krallık bulunamadı.', ephemeral: true });
+    return interaction.reply({ content: 'Sunucuda herhangi bir krallık bulunamadı.', ephemeral: false });
   }
 
   const embed = new EmbedBuilder()
@@ -453,7 +453,7 @@ client.on('interactionCreate', async interaction => {
 
 
       case 'veliahtdevret': {
-        await interaction.reply({ content: 'Veliaht devri komutu aktif değil.', ephemeral: true });
+        await interaction.reply({ content: 'Veliaht devri komutu aktif değil.', ephemeral: false });
         break;
       }
 
@@ -463,14 +463,14 @@ client.on('interactionCreate', async interaction => {
         const kisi = interaction.options.getUser('kişi');
         const sebep = interaction.options.getString('sebep');
 
-        if (!kisi) return interaction.reply({ content: 'Kullanıcı bulunamadı.', ephemeral: true });
+        if (!kisi) return interaction.reply({ content: 'Kullanıcı bulunamadı.', ephemeral: false });
 
         try {
           const member = await interaction.guild.members.fetch(kisi.id);
           await member.ban({ reason: sebep });
           await interaction.reply({ content: `${kisi.tag} banlandı. Sebep: ${sebep}` });
         } catch (err) {
-          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: true });
+          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: false });
         }
         break;
       }
@@ -479,13 +479,13 @@ client.on('interactionCreate', async interaction => {
         if (!yetkiKontrol(interaction, ['Admin', 'Founder'])) return;
 
         const kisi = interaction.options.getUser('kişi');
-        if (!kisi) return interaction.reply({ content: 'Kullanıcı bulunamadı.', ephemeral: true });
+        if (!kisi) return interaction.reply({ content: 'Kullanıcı bulunamadı.', ephemeral: false });
 
         try {
           await interaction.guild.bans.remove(kisi.id);
           await interaction.reply({ content: `${kisi.tag} banı kaldırıldı.` });
         } catch (err) {
-          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: true });
+          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: false });
         }
         break;
       }
@@ -498,12 +498,12 @@ client.on('interactionCreate', async interaction => {
 
         // Süre formatı HH:MM
         const match = sure.match(/^(\d{1,2}):(\d{1,2})$/);
-        if (!match) return interaction.reply({ content: 'Süre formatı hatalı. (Saat:Dakika)', ephemeral: true });
+        if (!match) return interaction.reply({ content: 'Süre formatı hatalı. (Saat:Dakika)', ephemeral: false });
 
         const saat = parseInt(match[1]);
         const dakika = parseInt(match[2]);
 
-        if (isNaN(saat) || isNaN(dakika)) return interaction.reply({ content: 'Süre geçersiz.', ephemeral: true });
+        if (isNaN(saat) || isNaN(dakika)) return interaction.reply({ content: 'Süre geçersiz.', ephemeral: false });
 
         const süreMs = (saat * 60 + dakika) * 60000;
 
@@ -511,7 +511,7 @@ client.on('interactionCreate', async interaction => {
           await kisi.timeout(süreMs, 'Mute komutu ile zaman aşımı.');
           await interaction.reply({ content: `${kisi.user.tag} kullanıcıya ${sure} süreyle mute uygulandı.` });
         } catch (err) {
-          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: true });
+          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: false });
         }
         break;
       }
@@ -525,7 +525,7 @@ client.on('interactionCreate', async interaction => {
           await kisi.timeout(null);
           await interaction.reply({ content: `${kisi.user.tag} kullanıcıdan mute kaldırıldı.` });
         } catch (err) {
-          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: true });
+          await interaction.reply({ content: `Hata: ${err.message}`, ephemeral: false });
         }
         break;
       }
@@ -540,19 +540,19 @@ client.on('interactionCreate', async interaction => {
           await kisi.send(mesaj);
           await interaction.reply({ content: `Mesaj ${kisi.tag} kullanıcısına gönderildi.` });
         } catch {
-          await interaction.reply({ content: 'DM gönderilemedi, kullanıcı DM kapalı olabilir.', ephemeral: true });
+          await interaction.reply({ content: 'DM gönderilemedi, kullanıcı DM kapalı olabilir.', ephemeral: false });
         }
         break;
       }
 
       default:
-        await interaction.reply({ content: 'Bilinmeyen komut.', ephemeral: true });
+        await interaction.reply({ content: 'Bilinmeyen komut.', ephemeral: false });
         break;
     }
   } catch (error) {
     console.error(error);
     if (!interaction.replied) {
-      await interaction.reply({ content: 'Komut işlenirken hata oluştu.', ephemeral: true });
+      await interaction.reply({ content: 'Komut işlenirken hata oluştu.', ephemeral: false });
     }
   }
 });
